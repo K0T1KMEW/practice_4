@@ -1,0 +1,7 @@
+__pycache__/
+.env
+Задание практикантам.docx
+logs/
+venv/
+docker-compose.yml
+Dockerfile
