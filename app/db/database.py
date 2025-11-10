@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 from typing import List, Optional, Dict, Any
 
 from app.models.base import Base
-from app.models.models import Employees, Departments, Skills
+from app.models.models import Employees, Departments
 from app.models.user import User
-from app.logger_config import setup_logger
+from app.logger.logger_config import setup_logger
 
 logger = setup_logger(__name__)
 load_dotenv()
@@ -40,7 +40,7 @@ class EmployeeDatabaseManager:
             
         try:
             async with self.engine.connect() as conn:
-                tables_to_check = ['users', 'employees', 'departments', 'skills', 'employee_skill']
+                tables_to_check = ['users', 'employees', 'departments']
                 
                 for table_name in tables_to_check:
                     result = await conn.execute(
@@ -358,65 +358,7 @@ class EmployeeDatabaseManager:
             logger.error(f"Ошибка удаления отдела: {e}")
             await self.session.rollback()
             return False
-
-    # async def get_all_skills(self) -> List[Skills]:
-    #     if not self.session:
-    #         return []
-            
-    #     try:
-    #         result = await self.session.execute(select(Skills))
-    #         return result.scalars().all()
-    #     except SQLAlchemyError as e:
-    #         logger.error(f"Ошибка получения списка навыков: {e}")
-    #         return []
-
-    # async def add_skill_to_employee(self, employee_id: int, skill_id: int) -> bool:
-    #     if not self.session:
-    #         return False
-            
-    #     try:
-    #         employee = await self.get_employee_by_id(employee_id)
-    #         skill = await self.session.execute(
-    #             select(Skills).where(Skills.id == skill_id)
-    #         )
-    #         skill = skill.scalar_one_or_none()
-            
-    #         if employee and skill and skill not in employee.skills:
-    #             employee.skills.append(skill)
-    #             await self.session.commit()
-    #             logger.info(f"Навык добавлен сотруднику {employee_id}")
-    #             return True
-    #         return False
-            
-    #     except SQLAlchemyError as e:
-    #         logger.error(f"Ошибка добавления навыка сотруднику: {e}")
-    #         await self.session.rollback()
-    #         return False
-
-    # async def remove_skill_from_employee(self, employee_id: int, skill_id: int) -> bool:
-    #     if not self.session:
-    #         return False
-            
-    #     try:
-    #         employee = await self.get_employee_by_id(employee_id)
-    #         skill = await self.session.execute(
-    #             select(Skills).where(Skills.id == skill_id)
-    #         )
-    #         skill = skill.scalar_one_or_none()
-            
-    #         if employee and skill and skill in employee.skills:
-    #             employee.skills.remove(skill)
-    #             await self.session.commit()
-    #             logger.info(f"Навык удален у сотрудника {employee_id}")
-    #             return True
-    #         return False
-            
-    #     except SQLAlchemyError as e:
-    #         logger.error(f"Ошибка удаления навыка у сотрудника: {e}")
-    #         await self.session.rollback()
-    #         return False
         
-
     async def get_user_by_username(self, username: str) -> Optional[User]:
         if not self.session:
             return None

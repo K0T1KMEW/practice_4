@@ -12,6 +12,7 @@ class EmployeeBase(BaseModel):
     salary: int = Field(..., ge=0, description="Зарплата")
     date_of_admission: str = Field(..., description="Дата приема в формате YYYY-MM-DD")
     department_id: Optional[int] = Field(None, description="ID отдела")
+    photo: Optional[str] = Field(None, description="URL фотографии")
 
 class EmployeeCreate(EmployeeBase):
     pass
@@ -26,7 +27,8 @@ class EmployeeUpdate(BaseModel):
     salary: Optional[int] = None
     date_of_admission: Optional[str] = None
     department_id: Optional[int] = None
-
+    photo: Optional[str] = None
+    
 class EmployeeResponse(EmployeeBase):
     id: int
     

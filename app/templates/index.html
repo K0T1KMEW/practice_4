@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee System</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .login-form { width: 300px; margin: 50px auto; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; }
+        .error { color: red; background: #ffe6e6; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .employee-photo { width: 50px; height: 50px; object-fit: cover; border-radius: 5px; }
+        .actions { display: flex; gap: 10px; }
+        .btn { padding: 5px 10px; text-decoration: none; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Система сотрудников</h1>
+
+    {% if not request.cookies.get('access_token') %}
+    <div class="login-form">
+        <h3>Вход в систему</h3>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/login">
+            <input type="text" name="username" placeholder="Логин" required>
+            <input type="password" name="password" placeholder="Пароль" required>
+            <button type="submit">Войти</button>
+        </form>
+        <p style="margin-top: 15px; font-size: 12px; color: #666;">
+            Для доступа к системе необходимо войти.<br>
+            Если у вас нет аккаунта, создайте его через API.
+        </p>
+    </div>
+
+    {% else %}
+    <div class="header">
+        <h2>Список сотрудников</h2>
+        <div>
+            <a href="/add-employee" class="btn btn-success">Добавить сотрудника</a>
+            <button onclick="loadEmployees()" class="btn btn-primary">Обновить список</button>
+            <a href="/logout" class="btn btn-secondary">Выйти</a>
+        </div>
+    </div>
+    
+    <div id="employees-list">
+        Нажмите "Обновить список" чтобы увидеть сотрудников
+    </div>
+    {% endif %}
+
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) {
+                let cookieValue = parts.pop().split(';').shift();
+                cookieValue = cookieValue.replace(/^"|"$/g, '');
+                return cookieValue;
+            }
+            return null;
+        }
+
+        async function loadEmployees() {
+            const token = getCookie('access_token');
+            
+            if (!token) {
+                alert('Токен не найден! Войдите заново.');
+                return;
+            }
+
+            try {
+                document.getElementById('employees-list').innerHTML = 'Загрузка...';
+                
+                const response = await fetch('/api/employees/', {
+                    headers: {
+                        'Authorization': token
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const employees = await response.json();
+                displayEmployees(employees);
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('employees-list').innerHTML = 
+                    '<div style="color: red;">Ошибка загрузки: ' + error.message + '</div>';
+            }
+        }
+
+        function displayEmployees(employees) {
+            const container = document.getElementById('employees-list');
+            
+            if (employees.length === 0) {
+                container.innerHTML = 'Нет сотрудников';
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Фото</th>
+                            <th>ID</th>
+                            <th>ФИО</th>
+                            <th>Должность</th>
+                            <th>Отдел</th>
+                            <th>Зарплата</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            employees.forEach(employee => {
+                html += `
+                    <tr>
+                        <td>
+                            ${employee.photo ? 
+                                `<img src="${employee.photo}" class="employee-photo" alt="${employee.username}">` : 
+                                'Нет фото'
+                            }
+                        </td>
+                        <td>${employee.id}</td>
+                        <td>${employee.username}</td>
+                        <td>${employee.job_title}</td>
+                        <td>${employee.department}</td>
+                        <td>${employee.salary} ₽</td>
+                        <td>${employee.status}</td>
+                        <td class="actions">
+                            <a href="/employee/${employee.id}" class="btn btn-primary">Просмотр</a>
+                            <a href="/edit-employee/${employee.id}" class="btn btn-secondary">Редактировать</a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('employees-list')) {
+                loadEmployees();
+            }
+        });
+    </script>
+</body>
+</html>

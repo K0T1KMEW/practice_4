@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Добавить сотрудника</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .error { color: red; background: #ffe6e6; padding: 10px; margin-bottom: 15px; }
+        .btn-back { background: #6c757d; margin-right: 10px; text-decoration: none; padding: 8px 16px; color: white; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Добавить сотрудника</h1>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="username">ФИО:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+
+        <div class="form-group">
+            <label for="date_of_birth">Дата рождения:</label>
+            <input type="date" id="date_of_birth" name="date_of_birth" required>
+        </div>
+
+        <div class="form-group">
+            <label for="department">Отдел:</label>
+            <input type="text" id="department" name="department" required>
+        </div>
+
+        <div class="form-group">
+            <label for="job_title">Должность:</label>
+            <input type="text" id="job_title" name="job_title" required>
+        </div>
+
+        <div class="form-group">
+            <label for="salary">Зарплата:</label>
+            <input type="number" id="salary" name="salary" required>
+        </div>
+
+        <div class="form-group">
+            <label for="bet">Ставка:</label>
+            <select id="bet" name="bet" required>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="photo">Фотография:</label>
+            <input type="file" id="photo" name="photo" accept="image/*">
+        </div>
+
+        <div>
+            <a href="/" class="btn-back">Назад к списку</a>
+            <button type="submit">Добавить сотрудника</button>
+        </div>
+    </form>
+</body>
+</html>

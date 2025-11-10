@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ employee.username }}</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .employee-card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .employee-photo { max-width: 200px; border-radius: 8px; margin-bottom: 15px; }
+        .employee-info { margin-bottom: 10px; }
+        .label { font-weight: bold; }
+        .btn { padding: 8px 16px; text-decoration: none; border: none; border-radius: 4px; cursor: pointer; display: inline-block; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Карточка сотрудника</h1>
+
+    <div class="employee-card">
+        {% if employee.photo %}
+        <img src="{{ employee.photo }}" class="employee-photo" alt="{{ employee.username }}">
+        {% endif %}
+
+        <div class="employee-info">
+            <span class="label">ФИО:</span> {{ employee.username }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Дата рождения:</span> {{ employee.date_of_birth }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Должность:</span> {{ employee.job_title }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Отдел:</span> {{ employee.department }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Зарплата:</span> {{ employee.salary }} ₽
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Ставка:</span> {{ employee.bet }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Статус:</span> {{ employee.status }}
+        </div>
+
+        <div class="employee-info">
+            <span class="label">Дата приема:</span> {{ employee.date_of_admission }}
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a href="/" class="btn btn-secondary">Назад к списку</a>
+            <a href="/edit-employee/{{ employee.id }}" class="btn btn-primary">Редактировать</a>
+        </div>
+    </div>
+</body>
+</html>
