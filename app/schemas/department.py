@@ -1,19 +1,20 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 
 class DepartmentBase(BaseModel):
-    department_name: str = Field(..., description="Название отдела")
-    manager_id: Optional[int] = Field(..., description="ID управляющего отделом")
+    department_name: str
+    manager_id: Optional[int] = None
 
 class DepartmentCreate(DepartmentBase):
     pass
 
 class DepartmentUpdate(BaseModel):
-    department_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Название отдела")
-    manager_id: Optional[int] = Field(None, description="ID управляющего отделом")
+    department_name: Optional[str] = None
+    manager_id: Optional[int] = None
 
 class DepartmentResponse(DepartmentBase):
     id: int
+    manager_name: Optional[str] = None
     
     class Config:
         from_attributes = True

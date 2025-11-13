@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Any, Generic, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar('T')
 
 class Settings(BaseSettings):
     DB_HOST: str
@@ -25,3 +28,8 @@ class Settings(BaseSettings):
         case_sensitive = False
 
 settings = Settings()
+
+class DefaultResponse(BaseModel, Generic[T]):
+    error: bool
+    message: str
+    payload: Optional[Any] = None

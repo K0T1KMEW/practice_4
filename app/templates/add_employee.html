@@ -10,59 +10,150 @@
         button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .error { color: red; background: #ffe6e6; padding: 10px; margin-bottom: 15px; }
         .btn-back { background: #6c757d; margin-right: 10px; text-decoration: none; padding: 8px 16px; color: white; border-radius: 4px; }
+        .user-info { background: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .no-access { text-align: center; padding: 40px; color: #666; }
     </style>
 </head>
 <body>
+    <div class="user-info" id="user-info">
+        Загрузка информации о пользователе...
+    </div>
+
     <h1>Добавить сотрудника</h1>
 
-    {% if error %}
-    <div class="error">{{ error }}</div>
-    {% endif %}
+    <div id="form-section" style="display: none;">
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
 
-    <form method="post" enctype="multipart/form-data">
-        <div class="form-group">
-            <label for="username">ФИО:</label>
-            <input type="text" id="username" name="username" required>
-        </div>
+        <form method="post" enctype="multipart/form-data" id="employee-form">
+            <div class="form-group">
+                <label for="username">ФИО:</label>
+                <input type="text" id="username" name="username" value="{{ form_data.username if form_data }}" required>
+            </div>
 
-        <div class="form-group">
-            <label for="date_of_birth">Дата рождения:</label>
-            <input type="date" id="date_of_birth" name="date_of_birth" required>
-        </div>
+            <div class="form-group">
+                <label for="date_of_birth">Дата рождения:</label>
+                <input type="date" id="date_of_birth" name="date_of_birth" value="{{ form_data.date_of_birth if form_data }}" required>
+            </div>
 
-        <div class="form-group">
-            <label for="department">Отдел:</label>
-            <input type="text" id="department" name="department" required>
-        </div>
+            <div class="form-group">
+                <label for="department_id">Отдел:</label>
+                <select id="department_id" name="department_id" required>
+                    <option value="">Выберите отдел</option>
+                    {% for department in departments %}
+                    <option value="{{ department.id }}">{{ department.department_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <div class="form-group">
-            <label for="job_title">Должность:</label>
-            <input type="text" id="job_title" name="job_title" required>
-        </div>
+            <div class="form-group">
+                <label for="role_id">Должность:</label>
+                <select id="role_id" name="role_id" required>
+                    <option value="">Выберите должность</option>
+                    {% for role in roles %}
+                    <option value="{{ role.id }}">{{ role.role_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <div class="form-group">
-            <label for="salary">Зарплата:</label>
-            <input type="number" id="salary" name="salary" required>
-        </div>
+            <div class="form-group">
+                <label for="salary">Зарплата:</label>
+                <input type="number" id="salary" name="salary" value="{{ form_data.salary if form_data }}" required>
+            </div>
 
-        <div class="form-group">
-            <label for="bet">Ставка:</label>
-            <select id="bet" name="bet" required>
-                <option value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-            </select>
-        </div>
+            <div class="form-group">
+                <label for="bet">Ставка:</label>
+                <select id="bet" name="bet" required>
+                    <option value="0" {% if form_data and form_data.bet == 0 %}selected{% endif %}>0</option>
+                    <option value="1" {% if form_data and form_data.bet == 1 %}selected{% endif %}>1</option>
+                    <option value="2" {% if form_data and form_data.bet == 2 %}selected{% endif %}>2</option>
+                </select>
+            </div>
 
-        <div class="form-group">
-            <label for="photo">Фотография:</label>
-            <input type="file" id="photo" name="photo" accept="image/*">
-        </div>
+            <div class="form-group">
+                <label for="photo">Фотография:</label>
+                <input type="file" id="photo" name="photo" accept="image/*">
+            </div>
 
-        <div>
-            <a href="/" class="btn-back">Назад к списку</a>
-            <button type="submit">Добавить сотрудника</button>
-        </div>
-    </form>
+            <div>
+                <a href="/" class="btn-back">Назад к списку</a>
+                <button type="submit">Добавить сотрудника</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="no-access-section" class="no-access" style="display: none;">
+        <h3>Доступ запрещен</h3>
+        <p>У вас недостаточно прав для добавления сотрудников.</p>
+        <p>Только администраторы могут добавлять новых сотрудников в систему.</p>
+        <a href="/" class="btn-back">Вернуться на главную</a>
+    </div>
+
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) {
+                let cookieValue = parts.pop().split(';').shift();
+                cookieValue = cookieValue.replace(/^"|"$/g, '');
+                return cookieValue;
+            }
+            return null;
+        }
+
+        async function checkAccess() {
+            const token = getCookie('access_token');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.message);
+                }
+                
+                const user = result.payload;
+                displayUserInfo(user);
+                
+                if (user.role === 'admin') {
+                    document.getElementById('form-section').style.display = 'block';
+                } else {
+                    document.getElementById('no-access-section').style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Ошибка проверки прав доступа:', error);
+                document.getElementById('no-access-section').style.display = 'block';
+            }
+        }
+
+        function displayUserInfo(user) {
+            const userInfoDiv = document.getElementById('user-info');
+            userInfoDiv.innerHTML = `
+                <strong>Пользователь:</strong> ${user.username} | 
+                <strong>Роль:</strong> ${user.role} | 
+                <strong>Email:</strong> ${user.email}
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAccess();
+        });
+    </script>
 </body>
 </html>

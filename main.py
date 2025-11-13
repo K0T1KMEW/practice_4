@@ -1,3 +1,4 @@
+# app/main.py - ИСПРАВЛЕННАЯ ВЕРСИЯ
 from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -6,7 +7,7 @@ from contextlib import asynccontextmanager
 import os
 import uuid
 
-from app.api.routers import auth, employees, departments
+from app.api.routers import auth, employees, departments, roles
 from app.db.database import db_manager
 from app.core.security import verify_password, create_access_token
 from app.logger.logger_config import setup_logger
@@ -38,6 +39,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(employees.router, prefix="/api/employees", tags=["employees"])
 app.include_router(departments.router, prefix="/api/departments", tags=["departments"])
+app.include_router(roles.router, prefix="/api/roles", tags=["roles"])
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -51,7 +53,8 @@ async def login(
 ):
     await db_manager.create_connection()
     try:
-        user = await db_manager.get_user_by_username(username)
+        # ИСПРАВЛЕНО: используем нового менеджера users
+        user = await db_manager.users.get_by_username(username)
         if not user or not verify_password(password, user.hashed_password):
             return templates.TemplateResponse(
                 "index.html", 
@@ -89,15 +92,34 @@ async def add_employee_page(request: Request):
     if not token:
         return RedirectResponse(url="/")
     
-    return templates.TemplateResponse("add_employee.html", {"request": request})
+    await db_manager.create_connection()
+    try:
+        # ИСПРАВЛЕНО: получаем отделы и роли через новых менеджеров
+        departments_list = await db_manager.departments.get_all()
+        roles_list = await db_manager.roles.get_all()
+        
+        return templates.TemplateResponse("add_employee.html", {
+            "request": request,
+            "departments": departments_list,
+            "roles": roles_list
+        })
+    except Exception as e:
+        logger.error(f"Error loading departments/roles: {e}")
+        return templates.TemplateResponse("add_employee.html", {
+            "request": request,
+            "departments": [],
+            "roles": []
+        })
+    finally:
+        await db_manager.close_connection()
 
 @app.post("/add-employee")
 async def add_employee(
     request: Request,
     username: str = Form(...),
     date_of_birth: str = Form(...),
-    department: str = Form(...),
-    job_title: str = Form(...),
+    department_id: int = Form(...),  # ИСПРАВЛЕНО: department_id вместо department
+    role_id: int = Form(None),        # ИСПРАВЛЕНО: role_id вместо job_title
     salary: int = Form(...),
     bet: int = Form(...),
     photo: UploadFile = File(None)
@@ -121,30 +143,62 @@ async def add_employee(
     employee_data = {
         "username": username,
         "date_of_birth": date_of_birth,
-        "department": department,
-        "job_title": job_title,
+        "department_id": department_id,  # ИСПРАВЛЕНО
+        "role_id": role_id,              # ИСПРАВЛЕНО
         "salary": salary,
         "bet": bet,
         "status": "active",
-        "date_of_admission": "2024-01-01",
+        "date_of_admission": "2024-01-01", 
         "photo": photo_url
     }
     
     await db_manager.create_connection()
     try:
-        new_employee = await db_manager.create_employee(employee_data)
+        # ИСПРАВЛЕНО: используем нового менеджера employees
+        exists = await db_manager.employees.check_employee_exists(username, date_of_birth)
+        if exists:
+            departments_list = await db_manager.departments.get_all()
+            roles_list = await db_manager.roles.get_all()
+            return templates.TemplateResponse(
+                "add_employee.html", 
+                {
+                    "request": request, 
+                    "error": "Сотрудник с таким ФИО и датой рождения уже существует",
+                    "form_data": employee_data,
+                    "departments": departments_list,
+                    "roles": roles_list
+                }
+            )
+        
+        new_employee = await db_manager.employees.create(employee_data)
         if new_employee:
             return RedirectResponse(url="/", status_code=302)
         else:
+            departments_list = await db_manager.departments.get_all()
+            roles_list = await db_manager.roles.get_all()
             return templates.TemplateResponse(
                 "add_employee.html", 
-                {"request": request, "error": "Ошибка при создании сотрудника"}
+                {
+                    "request": request, 
+                    "error": "Ошибка при создании сотрудника",
+                    "form_data": employee_data,
+                    "departments": departments_list,
+                    "roles": roles_list
+                }
             )
     except Exception as e:
         logger.error(f"Error creating employee: {e}")
+        departments_list = await db_manager.departments.get_all()
+        roles_list = await db_manager.roles.get_all()
         return templates.TemplateResponse(
             "add_employee.html", 
-            {"request": request, "error": f"Ошибка: {str(e)}"}
+            {
+                "request": request, 
+                "error": f"Ошибка: {str(e)}",
+                "form_data": employee_data,
+                "departments": departments_list,
+                "roles": roles_list
+            }
         )
     finally:
         await db_manager.close_connection()
@@ -157,10 +211,20 @@ async def edit_employee_page(request: Request, employee_id: int):
     
     await db_manager.create_connection()
     try:
-        employee = await db_manager.get_employee_by_id(employee_id)
+        # ИСПРАВЛЕНО: используем нового менеджера employees
+        employee = await db_manager.employees.get_by_id(employee_id)
         if not employee:
             return RedirectResponse(url="/")
-        return templates.TemplateResponse("edit_employee.html", {"request": request, "employee": employee})
+        
+        departments_list = await db_manager.departments.get_all()
+        roles_list = await db_manager.roles.get_all()
+        
+        return templates.TemplateResponse("edit_employee.html", {
+            "request": request, 
+            "employee": employee,
+            "departments": departments_list,
+            "roles": roles_list
+        })
     except Exception as e:
         logger.error(f"Error getting employee {employee_id}: {e}")
         return RedirectResponse(url="/")
@@ -173,8 +237,8 @@ async def edit_employee(
     employee_id: int,
     username: str = Form(...),
     date_of_birth: str = Form(...),
-    department: str = Form(...),
-    job_title: str = Form(...),
+    department_id: int = Form(...),  # ИСПРАВЛЕНО
+    role_id: int = Form(...),        # ИСПРАВЛЕНО
     salary: int = Form(...),
     bet: int = Form(...),
     status: str = Form(...),
@@ -199,8 +263,8 @@ async def edit_employee(
     update_data = {
         "username": username,
         "date_of_birth": date_of_birth,
-        "department": department,
-        "job_title": job_title,
+        "department_id": department_id,  # ИСПРАВЛЕНО
+        "role_id": role_id,              # ИСПРАВЛЕНО
         "salary": salary,
         "bet": bet,
         "status": status
@@ -211,21 +275,38 @@ async def edit_employee(
     
     await db_manager.create_connection()
     try:
-        success = await db_manager.update_employee(employee_id, update_data)
+        # ИСПРАВЛЕНО: используем нового менеджера employees
+        success = await db_manager.employees.update(employee_id, update_data)
         if success:
             return RedirectResponse(url="/", status_code=302)
         else:
-            employee = await db_manager.get_employee_by_id(employee_id)
+            employee = await db_manager.employees.get_by_id(employee_id)
+            departments_list = await db_manager.departments.get_all()
+            roles_list = await db_manager.roles.get_all()
             return templates.TemplateResponse(
                 "edit_employee.html", 
-                {"request": request, "employee": employee, "error": "Ошибка при обновлении"}
+                {
+                    "request": request, 
+                    "employee": employee, 
+                    "error": "Ошибка при обновлении",
+                    "departments": departments_list,
+                    "roles": roles_list
+                }
             )
     except Exception as e:
         logger.error(f"Error updating employee {employee_id}: {e}")
-        employee = await db_manager.get_employee_by_id(employee_id)
+        employee = await db_manager.employees.get_by_id(employee_id)
+        departments_list = await db_manager.departments.get_all()
+        roles_list = await db_manager.roles.get_all()
         return templates.TemplateResponse(
             "edit_employee.html", 
-            {"request": request, "employee": employee, "error": f"Ошибка: {str(e)}"}
+            {
+                "request": request, 
+                "employee": employee, 
+                "error": f"Ошибка: {str(e)}",
+                "departments": departments_list,
+                "roles": roles_list
+            }
         )
     finally:
         await db_manager.close_connection()
@@ -234,7 +315,8 @@ async def edit_employee(
 async def employee_page(request: Request, employee_id: int):
     await db_manager.create_connection()
     try:
-        employee = await db_manager.get_employee_by_id(employee_id)
+        # ИСПРАВЛЕНО: используем нового менеджера employees
+        employee = await db_manager.employees.get_by_id(employee_id)
         if not employee:
             return RedirectResponse(url="/")
         return templates.TemplateResponse("employee.html", {"request": request, "employee": employee})

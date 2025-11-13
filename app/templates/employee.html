@@ -11,9 +11,14 @@
         .btn { padding: 8px 16px; text-decoration: none; border: none; border-radius: 4px; cursor: pointer; display: inline-block; }
         .btn-primary { background: #007bff; color: white; }
         .btn-secondary { background: #6c757d; color: white; margin-right: 10px; }
+        .user-info { background: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
+    <div class="user-info" id="user-info">
+        Загрузка информации о пользователе...
+    </div>
+
     <h1>Карточка сотрудника</h1>
 
     <div class="employee-card">
@@ -30,11 +35,11 @@
         </div>
 
         <div class="employee-info">
-            <span class="label">Должность:</span> {{ employee.job_title }}
+            <span class="label">Должность:</span> {{ employee.role_name if employee.role_name else 'Не указана' }}
         </div>
 
         <div class="employee-info">
-            <span class="label">Отдел:</span> {{ employee.department }}
+            <span class="label">Отдел:</span> {{ employee.department_name if employee.department_name else 'Не указан' }}
         </div>
 
         <div class="employee-info">
@@ -54,9 +59,65 @@
         </div>
 
         <div style="margin-top: 20px;">
-            <a href="/" class="btn btn-secondary">Назад к списку</a>
-            <a href="/edit-employee/{{ employee.id }}" class="btn btn-primary">Редактировать</a>
+            <a href="/" class="btn btn-secondary">Назад</a>
+            <a href="/edit-employee/{{ employee.id }}" class="btn btn-primary" id="edit-btn" style="display: none;">Редактировать</a>
         </div>
     </div>
+
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) {
+                let cookieValue = parts.pop().split(';').shift();
+                cookieValue = cookieValue.replace(/^"|"$/g, '');
+                return cookieValue;
+            }
+            return null;
+        }
+
+        async function loadUserInfo() {
+            const token = getCookie('access_token');
+            
+            if (!token) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (!result.error && result.payload) {
+                        const user = result.payload;
+                        displayUserInfo(user);
+                        
+                        if (user.role === 'admin') {
+                            document.getElementById('edit-btn').style.display = 'inline-block';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки информации о пользователе:', error);
+            }
+        }
+
+        function displayUserInfo(user) {
+            const userInfoDiv = document.getElementById('user-info');
+            userInfoDiv.innerHTML = `
+                <strong>Пользователь:</strong> ${user.username} | 
+                <strong>Роль:</strong> ${user.role} | 
+                <strong>Email:</strong> ${user.email}
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+        });
+    </script>
 </body>
 </html>

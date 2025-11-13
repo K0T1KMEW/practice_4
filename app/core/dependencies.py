@@ -27,7 +27,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     await db_manager.create_connection()
     try:
-        user = await db_manager.get_user_by_username(username)
+        user = await db_manager.users.get_by_username(username)
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

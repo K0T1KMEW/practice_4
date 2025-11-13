@@ -17,6 +17,8 @@
         .btn-secondary { background: #6c757d; color: white; }
         .btn-success { background: #28a745; color: white; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .user-info { background: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .no-access { text-align: center; padding: 40px; color: #666; }
     </style>
 </head>
 <body>
@@ -28,9 +30,9 @@
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
-        <form method="post" action="/login">
-            <input type="text" name="username" placeholder="Логин" required>
-            <input type="password" name="password" placeholder="Пароль" required>
+        <form id="login-form">
+            <input type="text" id="username" name="username" placeholder="Логин" required>
+            <input type="password" id="password" name="password" placeholder="Пароль" required>
             <button type="submit">Войти</button>
         </form>
         <p style="margin-top: 15px; font-size: 12px; color: #666;">
@@ -40,17 +42,40 @@
     </div>
 
     {% else %}
-    <div class="header">
-        <h2>Список сотрудников</h2>
-        <div>
-            <a href="/add-employee" class="btn btn-success">Добавить сотрудника</a>
-            <button onclick="loadEmployees()" class="btn btn-primary">Обновить список</button>
-            <a href="/logout" class="btn btn-secondary">Выйти</a>
+    <!-- Добавляем информацию о пользователе -->
+    <div class="user-info" id="user-info">
+        Загрузка информации о пользователе...
+    </div>
+
+    <!-- Контейнер для админ-функций (скрыт по умолчанию) -->
+    <div id="admin-section" style="display: none;">
+        <div class="header">
+            <h2>Список сотрудников</h2>
+            <div>
+                <a href="/add-employee" class="btn btn-success">Добавить сотрудника</a>
+                <button onclick="loadEmployees()" class="btn btn-primary">Обновить список</button>
+                <a href="/logout" class="btn btn-secondary">Выйти</a>
+            </div>
+        </div>
+        
+        <div id="employees-list">
+            Нажмите "Обновить список" чтобы увидеть сотрудников
         </div>
     </div>
-    
-    <div id="employees-list">
-        Нажмите "Обновить список" чтобы увидеть сотрудников
+
+    <div id="employee-section" style="display: none;">
+        <div class="header">
+            <h2>Панель сотрудника</h2>
+            <div>
+                <a href="/logout" class="btn btn-secondary">Выйти</a>
+            </div>
+        </div>
+        
+        <div class="no-access">
+            <h3>Добро пожаловать в систему!</h3>
+            <p>Как сотрудник, вы имеете доступ только к вашему личному профилю.</p>
+            <p>Для просмотра и управления списком всех сотрудников необходимы права администратора.</p>
+        </div>
     </div>
     {% endif %}
 
@@ -66,11 +91,116 @@
             return null;
         }
 
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const username = document.getElementById('username').value;
+                    const password = document.getElementById('password').value;
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('username', username);
+                        formData.append('password', password);
+
+                        const response = await fetch('/api/auth/token', {
+                            method: 'POST',
+                            body: new URLSearchParams({
+                                username: username,
+                                password: password
+                            }),
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            }
+                        });
+
+                        const result = await response.json();
+                        
+                        if (result.error) {
+                            alert('Ошибка входа: ' + result.message);
+                            return;
+                        }
+
+                        const token = result.payload.access_token;
+                        document.cookie = `access_token=${token}; path=/; max-age=86400`;
+                        
+                        window.location.href = '/';
+                        
+                    } catch (error) {
+                        console.error('Ошибка входа:', error);
+                        alert('Ошибка сети при входе');
+                    }
+                });
+            }
+
+            if (getCookie('access_token')) {
+                loadUserInfo();
+            }
+        });
+
+        async function loadUserInfo() {
+            const token = getCookie('access_token');
+            
+            if (!token) {
+                console.error('Токен не найден в куках');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.message);
+                }
+                
+                const user = result.payload;
+                displayUserInfo(user);
+                
+                if (user.role === 'admin') {
+                    document.getElementById('admin-section').style.display = 'block';
+                    loadEmployees();
+                } else {
+                    document.getElementById('employee-section').style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки информации о пользователе:', error);
+                document.getElementById('user-info').innerHTML = 
+                    '<div style="color: red;">Ошибка загрузки информации о пользователе: ' + error.message + '</div>';
+            }
+        }
+
+        function displayUserInfo(user) {
+            const userInfoDiv = document.getElementById('user-info');
+            userInfoDiv.innerHTML = `
+                <strong>Пользователь:</strong> ${user.username} | 
+                <strong>Роль:</strong> ${user.role} | 
+                <strong>Email:</strong> ${user.email}
+            `;
+        }
+
         async function loadEmployees() {
             const token = getCookie('access_token');
             
             if (!token) {
-                alert('Токен не найден! Войдите заново.');
+                console.error('Токен не найден в куках');
                 return;
             }
 
@@ -79,7 +209,7 @@
                 
                 const response = await fetch('/api/employees/', {
                     headers: {
-                        'Authorization': token
+                        'Authorization': `Bearer ${token}`
                     }
                 });
                 
@@ -88,11 +218,17 @@
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
                 
-                const employees = await response.json();
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.message);
+                }
+                
+                const employees = result.payload;
                 displayEmployees(employees);
                 
             } catch (error) {
-                console.error('Ошибка:', error);
+                console.error('Ошибка загрузки сотрудников:', error);
                 document.getElementById('employees-list').innerHTML = 
                     '<div style="color: red;">Ошибка загрузки: ' + error.message + '</div>';
             }
@@ -101,7 +237,7 @@
         function displayEmployees(employees) {
             const container = document.getElementById('employees-list');
             
-            if (employees.length === 0) {
+            if (!employees || employees.length === 0) {
                 container.innerHTML = 'Нет сотрудников';
                 return;
             }
@@ -134,8 +270,8 @@
                         </td>
                         <td>${employee.id}</td>
                         <td>${employee.username}</td>
-                        <td>${employee.job_title}</td>
-                        <td>${employee.department}</td>
+                        <td>${employee.role_name || 'Не указана'}</td>
+                        <td>${employee.department_name || 'Не указан'}</td>
                         <td>${employee.salary} ₽</td>
                         <td>${employee.status}</td>
                         <td class="actions">
@@ -149,12 +285,6 @@
             html += '</tbody></table>';
             container.innerHTML = html;
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            if (document.getElementById('employees-list')) {
-                loadEmployees();
-            }
-        });
     </script>
 </body>
 </html>
